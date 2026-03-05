@@ -31,9 +31,10 @@ class FaiveTrajectorySequenceDataset(TrajectoryDataset):
             with h5py.File(f, "r", swmr=True, libver='latest') as h5_file:
                 # check what datasets are there in this file
                 try:
-                    traj_data = {
-                        key: (h5_file[key], f, h5_file[key].name) for key in ["actions_franka", "actions_hand"] if key in h5_file
-                    }
+                    traj_data = {}
+                    for key in h5_file.keys():
+                        if key.startswith("actions_") and isinstance(h5_file[key], h5py.Dataset):
+                            traj_data[key] = (h5_file[key], f, h5_file[key].name)
                     # encode the task description
                     global_data = {
                         # key: sentence_model.encode([h5_file[key][()]])  for key in ["task_description"] if key in h5_file

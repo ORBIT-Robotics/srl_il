@@ -124,6 +124,22 @@ n_latency_steps: 0
 
 Take a look at `scripts/dataset_check.py`, run it with the same config file you use for tranining. It samples some batches from dataloader, and save the plots and gifs of the data into the run directory.
 
+## ORBIT IKARUS Bimanual Dataset
+
+`ORBIT_Teleop` exporter (`output_format: srl_il_faive`) now writes IKARUS keys directly. Use:
+
+```bash
+python3 scripts/run_pipeline.py --config-name=imitation_learning_ikarus_bimanual_act \
+  dataset_cfg.data.data_directory=/path/to/orbit_exported_h5_dir
+```
+
+Expected trajectory keys in each `.h5` file:
+- actions: `actions_ikarus_arm`, `actions_ikarus_hand` (plus `actions_ikarus_bimanual` and per-topic `actions_*`)
+- observations: `qpos_ikarus_arm`, `qpos_ikarus_hand`
+- image: `head/color` (and optionally `left_wrist/color`, `right_wrist/color`)
+
+`faive_dataset` now loads all root datasets prefixed with `actions_`, so custom IKARUS action keys are available without extra code changes.
+
 
 ## Key Components
 
@@ -224,4 +240,3 @@ try find [egl_probe from conda](https://anaconda.org/conda-forge/egl-probe) if y
 ### mujoco-py related error
 
 mujoco-py is deprecated. So please remove it. Also check your `site-packages` to make sure that it is completely removed. Make sure that you get `ImportError` when you `import mujoco_py`
-
