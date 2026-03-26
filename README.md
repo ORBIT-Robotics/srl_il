@@ -137,8 +137,9 @@ Expected trajectory keys in each `.h5` file:
 - actions: `actions_ikarus_arm`, `actions_ikarus_hand` (plus `actions_ikarus_bimanual` and per-topic `actions_*`)
 - observations: `qpos_ikarus_arm`, `qpos_ikarus_hand`
 - image: `head/color` (and optionally `left_wrist/color`, `right_wrist/color`)
+- depth: `head/depth` (`uint16` millimeters from `ORBIT_Teleop`, loaded in `srl_il` as meters with shape `(T, 1, H, W)`)
 
-`faive_dataset` now loads all root datasets prefixed with `actions_`, so custom IKARUS action keys are available without extra code changes.
+`faive_dataset` now loads all root datasets prefixed with `actions_`, and loads `observations/images/*/depth` when present.
 
 
 ## Key Components

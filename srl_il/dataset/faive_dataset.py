@@ -45,7 +45,10 @@ class FaiveTrajectorySequenceDataset(TrajectoryDataset):
                         key:  (obs_group[key], f, obs_group[key].name) for key in obs_group if key != "images"
                     })
                     for img_name, img_data in obs_group.get("images", {}).items():
-                        traj_data[f"{img_name}/color"] = (img_data["color"], f, img_data["color"].name)
+                        if "color" in img_data:
+                            traj_data[f"{img_name}/color"] = (img_data["color"], f, img_data["color"].name)
+                        if "depth" in img_data:
+                            traj_data[f"{img_name}/depth"] = (img_data["depth"], f, img_data["depth"].name)
                         if "extrinsics" in img_data:
                             global_data[f"{img_name}/extrinsics"] = (img_data["extrinsics"], f, img_data["extrinsics"].name)
                         if "intrinsics" in img_data:
@@ -120,6 +123,17 @@ class FaiveTrajectorySequenceDataset(TrajectoryDataset):
         data = torch.tensor(np.array(data)).float()
         if "color" in key:
             data = data.permute(0, 3, 1, 2) / 256.0
+        elif "depth" in key:
+            if data.ndim == 3:
+                data = data.unsqueeze(1)  # (T, 1, H, W)
+            elif data.ndim == 4 and data.shape[-1] == 1:
+                data = data.permute(0, 3, 1, 2)  # (T, H, W, 1) -> (T, 1, H, W)
+            elif data.ndim == 4 and data.shape[1] == 1:
+                pass  # already (T, 1, H, W)
+            else:
+                raise ValueError(f"Unsupported depth shape for key {key}: {tuple(data.shape)}")
+            # ORBIT_Teleop depth is exported as uint16 millimeters.
+            data = data / 1000.0
         return data
 
 

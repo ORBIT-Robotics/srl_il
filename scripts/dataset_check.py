@@ -51,12 +51,20 @@ class DataCheckPipeline(Pipeline, DatasetMixin, AlgoMixin, NormalizationMixin, D
         Save the images as mp4
         """
         B,T,C,H,W = data.shape
-        data = (data*255.0).to(torch.uint8)
+        data = torch.clamp(data, 0.0, 1.0)
+        data = (data * 255.0).to(torch.uint8)
         small_h = 128
         small_w = (W * small_h) // H
         for bi in range(B):
             output_path = f"{name_prefix}_{bi}.gif"
-            img_frames = [Image.fromarray(data[bi, ti].permute(1,2,0).cpu().numpy()).resize(size=(small_w, small_h)) for ti in range(T)]
+            img_frames = []
+            for ti in range(T):
+                frame = data[bi, ti].cpu()
+                if C == 1:
+                    arr = frame[0].numpy()
+                else:
+                    arr = frame.permute(1, 2, 0).numpy()
+                img_frames.append(Image.fromarray(arr).resize(size=(small_w, small_h)))
             img_frames[0].save(output_path, format='gif', save_all=True, append_images=img_frames[1:], optimize=True, duration=100, loop=0)
 
 
