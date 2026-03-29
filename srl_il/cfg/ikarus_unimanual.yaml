@@ -25,8 +25,9 @@ dataset_cfg:
     keys_traj: [
       ['actions_ikarus_command', 'actions_ikarus_command', 0, null],
       ['actions_ikarus_tau_ff', 'actions_ikarus_tau_ff', 0, null],
-      ['qpos_ikarus_arm', 'qpos_ikarus_arm', 0, 1],
+      ['joint_positions', 'joint_positions', 0, 1],
       ['head_images', 'head/color', 0, 1],
+      ['wrist_images', 'right_wrist/color', 0, 1],
       ['head_depth', 'head/depth', 0, 1],
     ]
     keys_global: []
@@ -53,7 +54,7 @@ algo_cfg:
     encoder_is_causal: false
     decoder_is_causal: true
     encoder_group_keys: ['qpos']
-    decoder_group_keys: ['qpos', 'head_images', 'head_depth']
+    decoder_group_keys: ['qpos', 'head_images', 'wrist_images', 'head_depth']
     encoder_cfg:
       d_model: 256
       nhead: 8
@@ -91,15 +92,24 @@ algo_cfg:
     output_dim: 256
     obs_groups_cfg:
       qpos:
-        # State feedback available in current logs is 5 right-arm joints.
-        datakeys: ['qpos_ikarus_arm']
+        # Use raw joint state positions from observations/joint_positions.
+        datakeys: ['joint_positions']
         encoder_cfg:
           type: lowdim_concat
-          input_dim_total: 5
+          input_dim_total: 12
         posemb_cfg:
           type: none
       head_images:
         datakeys: ['head_images']
+        encoder_cfg:
+          type: crop_resnet18
+          resize_shape: [224, 224]
+          crop_shape: null
+          pretrained: true
+        posemb_cfg:
+          type: none
+      wrist_images:
+        datakeys: ['wrist_images']
         encoder_cfg:
           type: crop_resnet18
           resize_shape: [224, 224]
@@ -128,8 +138,9 @@ algo_cfg:
       update_every: 1
       k: 0.01
     policy_obs_list:
-      - ['qpos_ikarus_arm', 1]
+      - ['joint_positions', 1]
       - ['head_images', 2]
+      - ['wrist_images', 2]
       - ['head_depth', 2]
 
 lr_scheduler_cfg:
@@ -176,11 +187,15 @@ normalizer_cfg:
     type: augmentor_stats
     min_max: true
     max_data_points: 100000
-  qpos_ikarus_arm:
+  joint_positions:
     type: augmentor_stats
     min_max: false
     max_data_points: 100000
   head_images:
+    type: hardcode
+    mean: [[[0.485]], [[0.456]], [[0.406]]]
+    std: [[[0.229]], [[0.224]], [[0.225]]]
+  wrist_images:
     type: hardcode
     mean: [[[0.485]], [[0.456]], [[0.406]]]
     std: [[[0.229]], [[0.224]], [[0.225]]]
@@ -191,13 +206,7 @@ normalizer_cfg:
 
 data_augmentation_cfg:
   data_augments:
-    - outname: qpos_ikarus_arm
-      type: feature_slice
-      # Joint order in current logs:
-      # [Shoulder2R, Shoulder3R, ElbowR, uaR, Shoulder1L, Shoulder1R, Shoulder2L, Shoulder3L, ElbowL, uaL]
-      # Keep right-arm joints only: [Shoulder2R, Shoulder3R, ElbowR, uaR, Shoulder1R]
-      indices: [0, 1, 2, 3, 5]
-    - outname: qpos_ikarus_arm
+    - outname: joint_positions
       type: gaussian_noise
       mean: 0.0
       std: 0.01
