@@ -101,6 +101,32 @@ class DataAugmentation_6Drotation2Ang(DataAgumentationBase):
         return actions, mask
 
 
+class DataAugmentationFeatureSlice(DataAgumentationBase):
+    """
+    Slice the last feature dimension.
+    Useful when logs include multi-arm action/state vectors but training targets only one arm.
+    """
+
+    def __init__(self, start=None, end=None, indices=None, **kwargs):
+        if indices is not None and (start is not None or end is not None):
+            raise ValueError("Use either indices or start/end for feature_slice, not both.")
+        self.start = start
+        self.end = end
+        self.indices = indices
+
+    def _slice(self, data):
+        if self.indices is not None:
+            idx = torch.tensor(self.indices, device=data.device, dtype=torch.long)
+            return torch.index_select(data, dim=-1, index=idx)
+        return data[..., self.start:self.end]
+
+    def augment_train(self, data, mask):
+        return self._slice(data), mask
+
+    def augment_eval(self, data, mask):
+        return self._slice(data), mask
+
+
 class DataAugmentation:
     def __init__(self, data_augments):
         self.data_augments_cfg = data_augments
@@ -114,6 +140,8 @@ class DataAugmentation:
                 self.augs.append(DataAugmentationTrajectorySpeed(**data_augment))
             if daug_type == "abs_action_rot_2_6d":
                 self.augs.append(DataAugmentation_6Drotation2Ang(**data_augment))
+            if daug_type == "feature_slice":
+                self.augs.append(DataAugmentationFeatureSlice(**data_augment))
 
     def augment_train(self, batch, mask_batch):
         for aug, data_augment in zip(self.augs, self.data_augments_cfg):

@@ -133,6 +133,13 @@ python3 scripts/run_pipeline.py --config-name=imitation_learning_ikarus_bimanual
   dataset_cfg.data.data_directory=/path/to/orbit_exported_h5_dir
 ```
 
+For single-arm training from bimanual command logs (use right-arm slices), use:
+
+```bash
+python3 scripts/run_pipeline.py --config-name=ikarus_unimanual \
+  dataset_cfg.data.data_directory=/path/to/orbit_exported_h5_dir
+```
+
 Expected trajectory keys in each `.h5` file:
 - actions: `actions_ikarus_arm`, `actions_ikarus_hand` (plus `actions_ikarus_bimanual` and per-topic `actions_*`)
 - observations: `qpos_ikarus_arm`, `qpos_ikarus_hand`
@@ -140,6 +147,10 @@ Expected trajectory keys in each `.h5` file:
 - depth: `head/depth` (`uint16` millimeters from `ORBIT_Teleop`, loaded in `srl_il` as meters with shape `(T, 1, H, W)`)
 
 `faive_dataset` now loads all root datasets prefixed with `actions_`, and loads `observations/images/*/depth` when present.
+
+Note on current ORBIT exports:
+- `qpos_ikarus_arm` / `qpos_ikarus_hand` are inferred from `joint_names`.
+- If hand joints are absent in `joint_states`, `qpos_ikarus_hand` falls back to the full joint vector and should not be used as real hand state.
 
 
 ## Key Components

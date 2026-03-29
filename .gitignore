@@ -5,4 +5,4 @@ outputs
 wandb
 runs
 Data
-.vscode/settings.json
+.vscode
