@@ -6,3 +6,4 @@ wandb
 runs
 Data
 .vscode
+.giignore
