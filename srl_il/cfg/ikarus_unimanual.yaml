@@ -23,12 +23,14 @@ dataset_cfg:
     window_size_train: 20
     window_size_test: 20
     keys_traj: [
-      ['actions_ikarus_command', 'actions_ikarus_command', 0, null],
-      ['actions_ikarus_tau_ff', 'actions_ikarus_tau_ff', 0, null],
-      ['joint_positions', 'joint_positions', 0, 1],
-      ['head_images', 'head/color', 0, 1],
-      ['wrist_images', 'right_wrist/color', 0, 1],
-      ['head_depth', 'head/depth', 0, 1],
+      ['poseR', 'poseR', 0, null],
+      ['hand_joints', 'hand_joints', 0, null],
+      ['joint_states', 'joint_states', 0, 1],
+      ['poseR_obs', 'poseR', 0, 1],
+      ['hand_joints_obs', 'hand_joints', 0, 1],
+      ['camera1', 'camera1/color', 0, 1],
+      ['camera2', 'camera2/color', 0, 1],
+      ['camera1_depth', 'camera1_depth', 0, 1],
     ]
     keys_global: []
     pad_before: false
@@ -37,24 +39,22 @@ dataset_cfg:
     random_seed: ${seed}
   batch_size: ${batch_size}
   pin_memory: true
-  num_workers: 2
+  num_workers: 12
 
 algo_cfg:
   _target_: srl_il.algo.act.ACTPolicyTrainer
   algo_cfg:
     device: cuda
     target_dims:
-      # Full /ikarus/command payload as exported in actions_ikarus_command.
-      actions_ikarus_command: 46
-      # Full /ikarus/tau_ff payload as exported in actions_ikarus_tau_ff.
-      actions_ikarus_tau_ff: 12
+      poseR: 7
+      hand_joints: 17
     z_dim: 32
     T_target: 20
     T_z: 1
     encoder_is_causal: false
     decoder_is_causal: true
     encoder_group_keys: ['qpos']
-    decoder_group_keys: ['qpos', 'head_images', 'wrist_images', 'head_depth']
+    decoder_group_keys: ['qpos', 'camera1', 'camera2', 'camera1_depth']
     encoder_cfg:
       d_model: 256
       nhead: 8
@@ -92,15 +92,14 @@ algo_cfg:
     output_dim: 256
     obs_groups_cfg:
       qpos:
-        # Use raw joint state positions from observations/joint_positions.
-        datakeys: ['joint_positions']
+        datakeys: ['joint_states', 'poseR_obs', 'hand_joints_obs']
         encoder_cfg:
           type: lowdim_concat
-          input_dim_total: 12
+          input_dim_total: 29
         posemb_cfg:
           type: none
-      head_images:
-        datakeys: ['head_images']
+      camera1:
+        datakeys: ['camera1']
         encoder_cfg:
           type: crop_resnet18
           resize_shape: [224, 224]
@@ -108,8 +107,8 @@ algo_cfg:
           pretrained: true
         posemb_cfg:
           type: none
-      wrist_images:
-        datakeys: ['wrist_images']
+      camera2:
+        datakeys: ['camera2']
         encoder_cfg:
           type: crop_resnet18
           resize_shape: [224, 224]
@@ -117,8 +116,8 @@ algo_cfg:
           pretrained: true
         posemb_cfg:
           type: none
-      head_depth:
-        datakeys: ['head_depth']
+      camera1_depth:
+        datakeys: ['camera1_depth']
         encoder_cfg:
           type: crop_resnet18
           resize_shape: [224, 224]
@@ -138,10 +137,12 @@ algo_cfg:
       update_every: 1
       k: 0.01
     policy_obs_list:
-      - ['joint_positions', 1]
-      - ['head_images', 2]
-      - ['wrist_images', 2]
-      - ['head_depth', 2]
+      - ['joint_states', 1]
+      - ['poseR_obs', 1]
+      - ['hand_joints_obs', 1]
+      - ['camera1', 2]
+      - ['camera2', 2]
+      - ['camera1_depth', 2]
 
 lr_scheduler_cfg:
   act_encoder:
@@ -179,34 +180,42 @@ training_cfg:
     every_n_epoch: 10
 
 normalizer_cfg:
-  actions_ikarus_command:
+  poseR:
     type: augmentor_stats
     min_max: true
     max_data_points: 100000
-  actions_ikarus_tau_ff:
+  hand_joints:
     type: augmentor_stats
     min_max: true
     max_data_points: 100000
-  joint_positions:
+  joint_states:
     type: augmentor_stats
     min_max: false
     max_data_points: 100000
-  head_images:
+  poseR_obs:
+    type: augmentor_stats
+    min_max: false
+    max_data_points: 100000
+  hand_joints_obs:
+    type: augmentor_stats
+    min_max: false
+    max_data_points: 100000
+  camera1:
     type: hardcode
     mean: [[[0.485]], [[0.456]], [[0.406]]]
     std: [[[0.229]], [[0.224]], [[0.225]]]
-  wrist_images:
+  camera2:
     type: hardcode
     mean: [[[0.485]], [[0.456]], [[0.406]]]
     std: [[[0.229]], [[0.224]], [[0.225]]]
-  head_depth:
+  camera1_depth:
     type: hardcode
     mean: 0.0
     std: 1.0
 
 data_augmentation_cfg:
   data_augments:
-    - outname: joint_positions
+    - outname: joint_states
       type: gaussian_noise
       mean: 0.0
       std: 0.01

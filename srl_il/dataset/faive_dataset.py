@@ -24,6 +24,19 @@ class FaiveTrajectorySequenceDataset(TrajectoryDataset):
         self.seqlengths = []
         self._h5_files = {} # file handlers
         self.cache_data_size = cache_data_size
+        self._root_camera_color_map = {
+            "camera1": "camera1/color",
+            "camera2": "camera2/color",
+        }
+        self._root_depth_map = {
+            "camera1_depth": "camera1_depth",
+        }
+        self._root_traj_passthrough = {
+            "joint_states",
+            "poseR",
+            "hand_joints",
+            "timestamps",
+        }
         # sentence_model = SentenceTransformer('all-MiniLM-L6-v2')
 
         # Iterate over all the files to find that keys in all files
@@ -32,6 +45,18 @@ class FaiveTrajectorySequenceDataset(TrajectoryDataset):
                 # check what datasets are there in this file
                 try:
                     traj_data = {}
+                    # Root-level keys in ORBIT_Teleop srl_il_faive_v2 exports.
+                    for src_key, out_key in self._root_camera_color_map.items():
+                        if src_key in h5_file and isinstance(h5_file[src_key], h5py.Dataset):
+                            traj_data[out_key] = (h5_file[src_key], f, h5_file[src_key].name)
+                    for src_key, out_key in self._root_depth_map.items():
+                        if src_key in h5_file and isinstance(h5_file[src_key], h5py.Dataset):
+                            traj_data[out_key] = (h5_file[src_key], f, h5_file[src_key].name)
+                    for key in self._root_traj_passthrough:
+                        if key in h5_file and isinstance(h5_file[key], h5py.Dataset):
+                            traj_data[key] = (h5_file[key], f, h5_file[key].name)
+
+                    # Root-level action datasets used by legacy and newer exporters.
                     for key in h5_file.keys():
                         if key.startswith("actions_") and isinstance(h5_file[key], h5py.Dataset):
                             traj_data[key] = (h5_file[key], f, h5_file[key].name)
@@ -40,26 +65,32 @@ class FaiveTrajectorySequenceDataset(TrajectoryDataset):
                         # key: sentence_model.encode([h5_file[key][()]])  for key in ["task_description"] if key in h5_file
                     }
 
-                    obs_group = h5_file["observations"]
-                    traj_data.update({
-                        key:  (obs_group[key], f, obs_group[key].name) for key in obs_group if key != "images"
-                    })
-                    for img_name, img_data in obs_group.get("images", {}).items():
-                        if "color" in img_data:
-                            traj_data[f"{img_name}/color"] = (img_data["color"], f, img_data["color"].name)
-                        if "depth" in img_data:
-                            traj_data[f"{img_name}/depth"] = (img_data["depth"], f, img_data["depth"].name)
-                        if "extrinsics" in img_data:
-                            global_data[f"{img_name}/extrinsics"] = (img_data["extrinsics"], f, img_data["extrinsics"].name)
-                        if "intrinsics" in img_data:
-                            global_data[f"{img_name}/intrinsics"] = (img_data["intrinsics"], f, img_data["intrinsics"].name)
-                        if "projection" in img_data:
-                            global_data[f"{img_name}/projection"] = (img_data["projection"], f, img_data["projection"].name)
+                    if "observations" in h5_file:
+                        obs_group = h5_file["observations"]
+                        traj_data.update({
+                            key:  (obs_group[key], f, obs_group[key].name) for key in obs_group if key != "images"
+                        })
+                        for img_name, img_data in obs_group.get("images", {}).items():
+                            if "color" in img_data:
+                                traj_data[f"{img_name}/color"] = (img_data["color"], f, img_data["color"].name)
+                            if "depth" in img_data:
+                                traj_data[f"{img_name}/depth"] = (img_data["depth"], f, img_data["depth"].name)
+                            if "extrinsics" in img_data:
+                                global_data[f"{img_name}/extrinsics"] = (img_data["extrinsics"], f, img_data["extrinsics"].name)
+                            if "intrinsics" in img_data:
+                                global_data[f"{img_name}/intrinsics"] = (img_data["intrinsics"], f, img_data["intrinsics"].name)
+                            if "projection" in img_data:
+                                global_data[f"{img_name}/projection"] = (img_data["projection"], f, img_data["projection"].name)
                 except Exception as e:
                     print(f"Warning: skipping {f}")
                     print(e)
                     continue
-            
+
+                if len(traj_data) == 0:
+                    print(f"Warning: skipping {f}")
+                    print("No trajectory datasets found.")
+                    continue
+
                 self.seqlengths.append(len(list(traj_data.values())[0][0]))
                 # populate self.traj_data, it's either cached data or a file path and dataset path
                 if self.traj_data is None:
